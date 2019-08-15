@@ -37,7 +37,7 @@ namespace aspect
        * @ingroup ParticleInterpolators
        */
       template<int dim>
-      class MovingLeastSquares : public Interface<dim>, public aspect::SimulatorAccess<dim> {
+      class MovingBilinearLeastSquares : public Interface<dim>, public aspect::SimulatorAccess<dim> {
       public:
         /**
          * Return the cell-wise evaluated properties of the bilinear least squares function at the positions.
@@ -66,7 +66,14 @@ namespace aspect
         parse_parameters(ParameterHandler &prm);
 
       private:
+        enum NeighboringCellChoice {
+          only_current_cell = 0,
+          first_neighbors = 1,
+          second_neighbors = 2
+        };
+        NeighboringCellChoice neighbor_usage = second_neighbors;
         bool allow_cells_without_particles = false;
+        double phi_scaling = 1;
         //double theta(const dealii::Tensor<1, dim, double>& s) const;
         double phi(double r)  const;
         double dirac_delta_h(const Tensor<1, dim, double>& x, double cell_diameter) const;
@@ -76,6 +83,9 @@ namespace aspect
 
         template<typename T>
         static void no_duplicate_insert(std::vector<T>& vector, const T& item);
+
+        double moving_bilinear_least_squares(std::size_t property_index, const ParticleHandler<dim> &particle_handler, const Point<dim>& support_point, std::size_t n_particles,
+                const std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator>& relevant_cells) const;
       }; // class MovingLeastSquares
     } // namespace Interpolator
 
