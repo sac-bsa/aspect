@@ -110,11 +110,11 @@ namespace aspect
             const double particle_property_value = particle->get_properties()[property_index];
             r[index] = particle_property_value;
 
-            const Point<dim> position = particle->get_location();
+            const Point<dim> particle_position = particle->get_location();
             A(index,0) = 1;
-            A(index,1) = (position[0] - approximated_cell_midpoint[0])/cell_diameter;
-            A(index,2) = (position[1] - approximated_cell_midpoint[1])/cell_diameter;
-            A(index,3) = (position[0] - approximated_cell_midpoint[0]) * (position[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
+            A(index,1) = (particle_position[0] - approximated_cell_midpoint[0]) / cell_diameter;
+            A(index,2) = (particle_position[1] - approximated_cell_midpoint[1]) / cell_diameter;
+            A(index,3) = (particle_position[0] - approximated_cell_midpoint[0]) * (particle_position[1] - approximated_cell_midpoint[1]) / std::pow(cell_diameter, 2);
           }
 
         dealii::LAPACKFullMatrix<double> B(matrix_dimension, matrix_dimension);
@@ -123,7 +123,7 @@ namespace aspect
         Vector<double> c(matrix_dimension);
 
         const double threshold = 1e-15;
-        unsigned int index_positions = 0;
+        unsigned int positions_index = 0;
 
         // Matrix A can be rank deficient if it does not have full rank, therefore singular.
         // To circumvent this issue, we solve A^TAx=A^Tr by using singular value
@@ -135,7 +135,7 @@ namespace aspect
         B_inverse.compute_inverse_svd(threshold);
         B_inverse.vmult(c, c_ATr);
 
-        for (typename std::vector<Point<dim> >::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
+        for (typename std::vector<Point<dim> >::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++positions_index)
           {
             const Point<dim> support_point = *itr;
             double interpolated_value = c[0] +
@@ -150,7 +150,7 @@ namespace aspect
                 interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
               }
 
-            cell_properties[index_positions][property_index] = interpolated_value;
+            cell_properties[positions_index][property_index] = interpolated_value;
           }
         return cell_properties;
       }
