@@ -67,7 +67,7 @@ namespace aspect
         std::vector<double> temp(n_particle_properties, 0.0);
         std::vector<std::vector<double> > point_properties(positions.size(), temp);
 
-        for (unsigned int pos_idx=0; pos_idx < positions.size(); ++pos_idx)
+        for (unsigned int support_point_index=0; support_point_index < positions.size(); ++support_point_index)
           {
             double minimum_distance = std::numeric_limits<double>::max();
             if (n_particles > 0)
@@ -76,7 +76,7 @@ namespace aspect
                 for (typename ParticleHandler<dim>::particle_iterator particle = particle_range.begin();
                      particle != particle_range.end(); ++particle)
                   {
-                    const double dist = (positions[pos_idx] - particle->get_location()).norm_square();
+                    const double dist = (positions[support_point_index] - particle->get_location()).norm_square();
                     if (dist < minimum_distance)
                       {
                         minimum_distance = dist;
@@ -86,7 +86,7 @@ namespace aspect
                 const dealii::ArrayView<const double> neighbor_props = nearest_neighbor->get_properties();
                 for (unsigned int i = 0; i < n_particle_properties; ++i)
                   if (selected_properties[i])
-                    point_properties[pos_idx][i] = neighbor_props[i];
+                    point_properties[support_point_index][i] = neighbor_props[i];
               }
             else
               {
@@ -101,7 +101,7 @@ namespace aspect
                     if (particle_handler.n_particles_in_cell(neighbors[i]) == 0)
                       continue;
 
-                    const double dist = (positions[pos_idx] - neighbors[i]->center()).norm_square();
+                    const double dist = (positions[support_point_index] - neighbors[i]->center()).norm_square();
                     if (dist < minimum_distance)
                       {
                         minimum_distance = dist;
@@ -119,16 +119,16 @@ namespace aspect
 
                 if (nearest_neighbor_cell != numbers::invalid_unsigned_int)
                   {
-                    point_properties[pos_idx] = properties_at_points(particle_handler,
-                                                                     std::vector<Point<dim> > (1,positions[pos_idx]),
-                                                                     selected_properties,
-                                                                     neighbors[nearest_neighbor_cell])[0];
+                    point_properties[support_point_index] = properties_at_points(particle_handler,
+                                                                                 std::vector<Point<dim> > (1,positions[support_point_index]),
+                                                                                 selected_properties,
+                                                                                 neighbors[nearest_neighbor_cell])[0];
                   }
                 else if (allow_cells_without_particles && nearest_neighbor_cell == numbers::invalid_unsigned_int)
                   {
                     for (unsigned int i = 0; i < n_particle_properties; ++i)
                       if (selected_properties[i])
-                        point_properties[pos_idx][i] = 0;
+                        point_properties[support_point_index][i] = 0;
                   }
 
               }

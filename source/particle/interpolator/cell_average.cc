@@ -74,7 +74,7 @@ namespace aspect
 
         if (n_particles > 0)
           {
-            for (typename ParticleHandler<dim>::particle_iterator particle = particle_range.begin();
+             for (typename ParticleHandler<dim>::particle_iterator particle = particle_range.begin();
                  particle != particle_range.end(); ++particle)
               {
                 const ArrayView<const double> &particle_properties = particle->get_properties();
@@ -87,6 +87,7 @@ namespace aspect
             for (unsigned int i = 0; i < n_particle_properties; ++i)
               if (selected_properties[i])
                 cell_properties[i] /= n_particles;
+
           }
         // If there are no particles in this cell use the average of the
         // neighboring cells.

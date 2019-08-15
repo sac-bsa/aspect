@@ -97,7 +97,7 @@ namespace aspect
         // Noticed that the size of matrix A is n_particles x matrix_dimension
         // which usually is not a square matrix. Therefore, we solve Ax=r by
         // solving A^TAx= A^Tr.
-        const unsigned int matrix_dimension = 4;
+        constexpr unsigned int matrix_dimension = 6;
         dealii::LAPACKFullMatrix<double> A(n_particles, matrix_dimension);
         Vector<double> r(n_particles);
         r = 0;
@@ -110,11 +110,11 @@ namespace aspect
             const double particle_property_value = particle->get_properties()[property_index];
             r[index] = particle_property_value;
 
-            const Point<dim> position = particle->get_location();
+            const Point<dim> particle_position = particle->get_location();
             A(index,0) = 1;
-            A(index,1) = (position[0] - approximated_cell_midpoint[0])/cell_diameter;
-            A(index,2) = (position[1] - approximated_cell_midpoint[1])/cell_diameter;
-            A(index,3) = (position[0] - approximated_cell_midpoint[0]) * (position[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
+            A(index,1) = (particle_position[0] - approximated_cell_midpoint[0])/cell_diameter;
+            A(index,2) = (particle_position[1] - approximated_cell_midpoint[1])/cell_diameter;
+            A(index,3) = (particle_position[0] - approximated_cell_midpoint[0]) * (particle_position[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
           }
 
         dealii::LAPACKFullMatrix<double> B(matrix_dimension, matrix_dimension);
@@ -143,6 +143,7 @@ namespace aspect
                                         c[2]*(support_point[1] - approximated_cell_midpoint[1])/cell_diameter +
                                         c[3]*(support_point[0] - approximated_cell_midpoint[0])*(support_point[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
 
+
             // Overshoot and undershoot correction of interpolated particle property.
             if (use_global_valued_limiter)
               {
@@ -154,6 +155,8 @@ namespace aspect
           }
         return cell_properties;
       }
+
+
 
       template <int dim>
       void
