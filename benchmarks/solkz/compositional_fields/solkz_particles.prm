@@ -12,7 +12,7 @@ set Dimension                              = 2
 set Start time                             = 0
 set End time                               = 0
 
-set Output directory                       = output
+set Output directory                       = output-peskinw1-bothcontin-ref=6
 
 set Pressure normalization                 = volume
 
@@ -60,7 +60,7 @@ end
 
 subsection Mesh refinement
   set Initial adaptive refinement              = 0
-  set Initial global refinement                = 5
+  set Initial global refinement                = 6
 end
 
 ############### Parameters describing the compositional field
@@ -78,7 +78,7 @@ subsection Initial composition model
   set Model name = function
   subsection Function
     set Variable names      = x,z
-    set Function constants  = pi=3.1415926, eta_b=1e6
+    set Function constants  = pi=3.1415926, eta_b=1E6
     set Function expression = -1 * sin(2*z) * cos(3*pi*x); exp(log(eta_b)*z)
   end
 end
@@ -101,14 +101,15 @@ subsection Postprocess
     set Data output format = vtu
     set List of particle properties = function
     set Integration scheme = rk2
-    set Interpolation scheme = cell average
+    set Interpolation scheme = peskin weighting
+    set peskin scaling = 1
     set Maximum particles per cell = 16384
     set Update ghost particles = true
 
     subsection Function
       set Number of components = 2
       set Variable names      = x, z
-      set Function constants  = pi=3.1415926, eta_b=1e6
+      set Function constants  = pi=3.1415926, eta_b=1E6
       set Function expression =  -1 * sin(2*z) * cos(3*pi*x); exp(log(eta_b)*z)
     end
 
