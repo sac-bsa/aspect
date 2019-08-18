@@ -75,18 +75,18 @@ namespace aspect
 
 
         std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator>
-                relevant_cells;
-        if (neighbor_usage == second_neighbors)
+                relevant_cells(get_lots_of_neighbors(found_cell));
+        /*if (neighbor_usage == second_neighbors)
         {
           relevant_cells = get_lots_of_neighbors(found_cell);
         } else if (neighbor_usage == first_neighbors)
         {
           GridTools::get_active_neighbors<parallel::distributed::Triangulation<dim> >(found_cell, relevant_cells);
           relevant_cells.emplace_back(found_cell);
-        } else
+        } else if (neighbor_usage == only_current_cell)
         {
           relevant_cells.emplace_back(found_cell);
-        }
+        }*/
 
         unsigned int n_particles = 0;
         for (const auto& current_cell : relevant_cells)
@@ -148,7 +148,8 @@ namespace aspect
           {
             const double particle_property_value = particle->get_properties()[property_index];
             const dealii::Tensor<1, 2, double> difference = (support_point - particle->get_location()) / cell_diameter;
-            const double weighting = phi(difference.norm());   //dirac_delta_h(difference, cell_diameter);
+            const double weighting =dirac_delta_h(difference, cell_diameter);
+                    //dirac_delta_h(difference, cell_diameter); // phi(difference.norm());
             Wb[particle_index] = weighting * particle_property_value;
 
             A(particle_index, 0) = 1;
@@ -159,6 +160,17 @@ namespace aspect
             A(particle_index, 4) = std::pow(difference[1], 2);
             A(particle_index, 5) = difference[0] * difference[1];
 
+//            A(particle_index, 6) = std::pow(difference[0], 3);
+//            A(particle_index, 7) = std::pow(difference[0], 2) * difference[1];
+//            A(particle_index, 8) = difference[0] * std::pow(difference[1], 2);
+//            A(particle_index, 9) = std::pow(difference[1], 3);
+//
+//            A(particle_index, 10) = std::pow(difference[0], 4);
+//            A(particle_index, 11) = std::pow(difference[0], 3) * difference[1];
+//            A(particle_index, 12) = std::pow(difference[0] * difference[1], 2);
+//            A(particle_index, 13) = difference[0] * std::pow(difference[1], 3);
+//            A(particle_index, 14) = std::pow(difference[1], 4);
+
 
             WA(particle_index, 0) = weighting; // A(particle_index, 0) is always 1
             WA(particle_index, 1) = weighting * A(particle_index, 1);
@@ -167,6 +179,16 @@ namespace aspect
             WA(particle_index, 3) = weighting * A(particle_index, 3);
             WA(particle_index, 4) = weighting * A(particle_index, 4);
             WA(particle_index, 5) = weighting * A(particle_index, 5);
+//
+//            WA(particle_index, 6) = weighting * std::pow(difference[0], 3);
+//            WA(particle_index, 7) = weighting * std::pow(difference[0], 2) * difference[1];
+//            WA(particle_index, 8) = weighting * difference[0] * std::pow(difference[1], 2);
+//            WA(particle_index, 9) = weighting * std::pow(difference[1], 3);
+//            WA(particle_index, 10) = weighting * std::pow(difference[0], 4);
+//            WA(particle_index, 11) = weighting * std::pow(difference[0], 3) * difference[1];
+//            WA(particle_index, 12) = weighting * std::pow(difference[0] * difference[1], 2);
+//            WA(particle_index, 13) = weighting * difference[0] * std::pow(difference[1], 3);
+//            WA(particle_index, 14) = weighting * std::pow(difference[1], 4);
           }
         }
 
@@ -260,14 +282,15 @@ template<>
         {
           prm.enter_subsection("Particles");
           {
-            prm.declare_entry("Allow cells without particles", "false",
-                              Patterns::Bool(),
-                              "By default, every cell needs to contain particles to use this interpolator "
-                              "plugin. If this parameter is set to true, cells are allowed to have no particles, "
-                              "in which case the interpolator will return 0 for the cell's properties.");
             prm.declare_entry("Moving least squares radius", "1",
                               Patterns::Double(1E-15, 2),
                               "Moving least squares uses a function with compact support to weight particles. This parameter chooses where the support becomes 0. This is measured in cell_radius");
+           /* prm.declare_entry("Use neighboring cells for particle interpolation",
+                    "2",
+                    Patterns::Integer(0, 2),
+                    "Moving Least squares can operate using no neighbors, "
+                    "each cell's first face neighbors, or each cells second face neighbors. Valid values are 0, 1 or 2.");*/
+
           }
           prm.leave_subsection();
         }
@@ -282,8 +305,8 @@ template<>
         {
           prm.enter_subsection("Particles");
           {
-            allow_cells_without_particles = prm.get_bool("Allow cells without particles");
             phi_scaling = prm.get_double("Moving least squares radius");
+            //neighbor_usage = static_cast<NeighboringCellChoice>(prm.get_integer("Use neighboring cells for particle interpolation"));
           }
           prm.leave_subsection();
         }
@@ -299,13 +322,13 @@ template<>
         if (r >= 2 || r <= -2)
           return 0;
         else if (r <= -1)
-          return (5 + 2 * r - std::sqrt(-7 - 12 * r - 4 * std::pow(r, 2))) / 8;
+          return (5 + 2 * r - std::sqrt(-7 - 12 * r - 4 * std::pow(r, 2))) / 4;
         else if (r <= 0)
-          return (3 + 2 * r + std::sqrt(1 - 4 * r - 4 * std::pow(r, 2))) / 8;
+          return (3 + 2 * r + std::sqrt(1 - 4 * r - 4 * std::pow(r, 2))) / 4;
         else if (r <= 1)
-          return (3 - 2 * r + std::sqrt(1 + 4 * r - 4 * std::pow(r, 2))) / 8;
+          return (3 - 2 * r + std::sqrt(1 + 4 * r - 4 * std::pow(r, 2))) / 4;
         else // (r <= 2)
-          return (5 - 2 * r - std::sqrt(- 7 + 12 * r - 4 * std::pow(r, 2))) / 8;
+          return (5 - 2 * r - std::sqrt(- 7 + 12 * r - 4 * std::pow(r, 2))) / 4;
       }
 
       template<int dim>
@@ -326,17 +349,16 @@ template<>
         std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator> all_cells;
         all_cells.emplace_back(origin_cell);
         // We only want to have the cells, its neighbors, and its second neighbors
-        // Its second neighbors can contain its first neighbors so we must ensure there is no duplication
+        // Its second neighbors can contain its first neighbors, as well as duplicates of it's second neighbors so we must check that there is no duplication
 
         std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator> original_neighbors;
 
         GridTools::get_active_neighbors<parallel::distributed::Triangulation<dim> >(origin_cell, original_neighbors);
-        // Get active neighbors clears the vector for us, so we can reuse one vector for all second neighbors
-        std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator> neighbors;
-        for (const auto& cell : original_neighbors) {
-          no_duplicate_insert(all_cells, cell);
-          GridTools::get_active_neighbors<parallel::distributed::Triangulation<dim> >(cell, neighbors);
-          for (const auto& neighboring_cell : neighbors)
+        for (const typename parallel::distributed::Triangulation<dim>::active_cell_iterator & current_cell : original_neighbors) {
+          no_duplicate_insert(all_cells, current_cell);
+          std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator> neighbors;
+          GridTools::get_active_neighbors<parallel::distributed::Triangulation<dim> >(current_cell, neighbors);
+          for (const typename parallel::distributed::Triangulation<dim>::active_cell_iterator& neighboring_cell : neighbors)
             no_duplicate_insert(all_cells, neighboring_cell);
         }
         return all_cells;
@@ -351,9 +373,6 @@ template<>
             return;
         vector.emplace_back(item);
       }
-
-
-
     }
   }
 }
@@ -366,7 +385,8 @@ namespace aspect {
 
       ASPECT_REGISTER_PARTICLE_INTERPOLATOR(MovingBilinearLeastSquares,
       "moving bilinear least squares",
-      "Interpolates particle properties using the idea of moving least squares regression")
+      "Interpolates particle properties using "
+      "moving least squares regression")
 
     }
   }

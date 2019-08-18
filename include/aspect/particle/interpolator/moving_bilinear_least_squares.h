@@ -66,15 +66,13 @@ namespace aspect
         parse_parameters(ParameterHandler &prm);
 
       private:
-        enum NeighboringCellChoice {
+        /*enum NeighboringCellChoice {
           only_current_cell = 0,
           first_neighbors = 1,
           second_neighbors = 2
         };
-        NeighboringCellChoice neighbor_usage = second_neighbors;
-        bool allow_cells_without_particles = false;
+        NeighboringCellChoice neighbor_usage = second_neighbors;*/
         double phi_scaling = 1;
-        //double theta(const dealii::Tensor<1, dim, double>& s) const;
         double phi(double r)  const;
         double dirac_delta_h(const Tensor<1, dim, double>& x, double cell_diameter) const;
 
