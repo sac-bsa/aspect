@@ -113,7 +113,7 @@ namespace aspect
 
         return cell_properties;
       }
-
+/*
       template<>
       double
       MovingBilinearLeastSquares<2>::moving_bilinear_least_squares(
@@ -194,6 +194,70 @@ namespace aspect
 
         dealii::LAPACKFullMatrix<double>ATWA(matrix_dimension, matrix_dimension);
         A.Tmmult(ATWA, WA);
+        constexpr double svd_threshold = 1E-15;
+        dealii::LAPACKFullMatrix<double>ATWA_inverse(ATWA);
+        ATWA_inverse.compute_inverse_svd(svd_threshold);
+        dealii::Vector<double> ATWb(matrix_dimension);
+        dealii::Vector<double> c(matrix_dimension);
+        A.Tvmult(ATWb, Wb);
+        ATWA_inverse.vmult(c, ATWb);
+
+        return c[0];
+      }
+ */
+      template<>
+      double
+      MovingBilinearLeastSquares<2>::moving_bilinear_least_squares(
+              std::size_t property_index,
+              const ParticleHandler<2> &particle_handler,
+              const Point<2>& support_point,
+              std::size_t n_particles,
+              const std::vector<typename parallel::distributed::Triangulation<2>::active_cell_iterator>& relevant_cells) const
+      {
+        const double cell_diameter = relevant_cells.front()->diameter();
+        // Ac = b
+        // WAc = Wb
+        // (A^T)WAc = (A^T)Wb
+        // inv((A^T)WA)(A^T)WAc = inv((A^T)WA)(A^T)Wb
+        // c = inv((A^T)WA)(A^T)Wb
+
+        constexpr unsigned int matrix_dimension = 6; // 1, x, y // x^2, y^2, xy
+        dealii::LAPACKFullMatrix<double> A(n_particles, matrix_dimension);
+        dealii::LAPACKFullMatrix<double> W(n_particles);
+        dealii::Vector<double> Wb(n_particles);
+
+
+        std::size_t particle_index = 0;
+
+        for (const auto& current_cell : relevant_cells)
+        {
+          const typename ParticleHandler<2>::particle_iterator_range particle_range =
+                  particle_handler.particles_in_cell(current_cell);
+          for (typename ParticleHandler<2>::particle_iterator particle = particle_range.begin();
+               particle != particle_range.end(); ++particle, ++particle_index)
+          {
+            const double particle_property_value = particle->get_properties()[property_index];
+            const dealii::Tensor<1, 2, double> difference = (support_point - particle->get_location()) / cell_diameter;
+            const double weighting = dirac_delta_h(difference, cell_diameter);
+            Wb[particle_index] = weighting * particle_property_value;
+
+            A(particle_index, 0) = 1;
+            A(particle_index, 1) = difference[0];
+            A(particle_index, 2) = difference[1];
+            A(particle_index, 3) = std::pow(difference[0], 2);
+            A(particle_index, 4) = std::pow(difference[1], 2);
+            A(particle_index, 5) = difference[0] * difference[1];
+
+            for (std::size_t index = 0; index < n_particles; ++index)
+              W(particle_index,index) = (particle_index == index)? weighting : 0;
+
+          }
+        }
+
+        dealii::LAPACKFullMatrix<double> ATW(matrix_dimension, n_particles);
+        dealii::LAPACKFullMatrix<double>ATWA(matrix_dimension, matrix_dimension);
+        A.Tmmult(ATW, W);
+        ATW.mmult(ATWA, A);
         constexpr double svd_threshold = 1E-15;
         dealii::LAPACKFullMatrix<double>ATWA_inverse(ATWA);
         ATWA_inverse.compute_inverse_svd(svd_threshold);
@@ -322,13 +386,13 @@ template<>
         if (r >= 2 || r <= -2)
           return 0;
         else if (r <= -1)
-          return (5 + 2 * r - std::sqrt(-7 - 12 * r - 4 * std::pow(r, 2))) / 4;
+          return (5 + 2 * r - std::sqrt(-7 - 12 * r - 4 * std::pow(r, 2))) / 8;
         else if (r <= 0)
-          return (3 + 2 * r + std::sqrt(1 - 4 * r - 4 * std::pow(r, 2))) / 4;
+          return (3 + 2 * r + std::sqrt(1 - 4 * r - 4 * std::pow(r, 2))) / 8;
         else if (r <= 1)
-          return (3 - 2 * r + std::sqrt(1 + 4 * r - 4 * std::pow(r, 2))) / 4;
+          return (3 - 2 * r + std::sqrt(1 + 4 * r - 4 * std::pow(r, 2))) / 8;
         else // (r <= 2)
-          return (5 - 2 * r - std::sqrt(- 7 + 12 * r - 4 * std::pow(r, 2))) / 4;
+          return (5 - 2 * r - std::sqrt(- 7 + 12 * r - 4 * std::pow(r, 2))) / 8;
       }
 
       template<int dim>
