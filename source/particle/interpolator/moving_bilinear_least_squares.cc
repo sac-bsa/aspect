@@ -75,8 +75,8 @@ namespace aspect
 
 
         std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator>
-                relevant_cells(get_lots_of_neighbors(found_cell));
-        /*if (neighbor_usage == second_neighbors)
+                relevant_cells;
+        if (neighbor_usage == second_neighbors)
         {
           relevant_cells = get_lots_of_neighbors(found_cell);
         } else if (neighbor_usage == first_neighbors)
@@ -86,7 +86,7 @@ namespace aspect
         } else if (neighbor_usage == only_current_cell)
         {
           relevant_cells.emplace_back(found_cell);
-        }*/
+        }
 
         unsigned int n_particles = 0;
         for (const auto& current_cell : relevant_cells)
@@ -349,11 +349,12 @@ template<>
             prm.declare_entry("Moving least squares radius", "1",
                               Patterns::Double(1E-15, 2),
                               "Moving least squares uses a function with compact support to weight particles. This parameter chooses where the support becomes 0. This is measured in cell_radius");
-           /* prm.declare_entry("Use neighboring cells for particle interpolation",
+            prm.declare_entry("Use neighboring cells for particle interpolation",
                     "2",
                     Patterns::Integer(0, 2),
                     "Moving Least squares can operate using no neighbors, "
-                    "each cell's first face neighbors, or each cells second face neighbors. Valid values are 0, 1 or 2.");*/
+                    "each cell's first face neighbors, or each cells second face neighbors. Valid values are 0, 1 or 2.");
+
 
           }
           prm.leave_subsection();
