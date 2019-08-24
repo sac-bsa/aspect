@@ -72,9 +72,9 @@ namespace aspect
           second_neighbors = 2
         };
         NeighboringCellChoice neighbor_usage = second_neighbors;
-        double phi_scaling = 1;
-        double phi(double r)  const;
-        double dirac_delta_h(const Tensor<1, dim, double>& x, double cell_diameter) const;
+        double r = 1;
+        double phi(double difference)  const;
+        double dirac_delta_h(const Tensor<1, dim, double>& difference, double cell_diameter) const;
 
         static std::vector<typename parallel::distributed::Triangulation<dim>::active_cell_iterator> get_lots_of_neighbors(
                 typename parallel::distributed::Triangulation<dim>::active_cell_iterator origin_cell);

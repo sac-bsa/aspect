@@ -95,6 +95,7 @@ namespace aspect
                   particle_handler.particles_in_cell(current_cell);
           n_particles += std::distance(particle_range.begin(), particle_range.end());
         }
+
         AssertThrow(n_particles != 0, ExcMessage("No particles were found in any of the cells"));
 
         std::vector<std::vector<double>> cell_properties(positions.size(), std::vector<double>(n_particle_properties,
@@ -222,6 +223,11 @@ namespace aspect
         // c = inv((A^T)WA)(A^T)Wb
 
         constexpr unsigned int matrix_dimension = 6; // 1, x, y // x^2, y^2, xy
+        AssertThrow(n_particles > matrix_dimension,
+                ExcMessage("The moving bilinear least squares particle"
+                           " interpolator was called without enough particles"
+                           " to interpolate from, pleas re-run with more "
+                           "particles, or with more neighbors"));
         dealii::LAPACKFullMatrix<double> A(n_particles, matrix_dimension);
         dealii::LAPACKFullMatrix<double> W(n_particles);
         dealii::Vector<double> Wb(n_particles);
@@ -238,7 +244,7 @@ namespace aspect
           {
             const double particle_property_value = particle->get_properties()[property_index];
             const dealii::Tensor<1, 2, double> difference = (support_point - particle->get_location()) / cell_diameter;
-            const double weighting = dirac_delta_h(difference, cell_diameter);
+            const double weighting = dirac_delta_h(difference, cell_diameter); //dirac_delta_h(difference, cell_diameter);  //phi(difference.norm());
             Wb[particle_index] = weighting * particle_property_value;
 
             A(particle_index, 0) = 1;
@@ -248,12 +254,37 @@ namespace aspect
             A(particle_index, 4) = std::pow(difference[1], 2);
             A(particle_index, 5) = difference[0] * difference[1];
 
+//            A(particle_index, 6) = std::pow(difference[0], 3);
+//            A(particle_index, 7) = std::pow(difference[0], 2) * difference[1];
+//            A(particle_index, 8) = difference[0] * std::pow(difference[1], 2);
+//            A(particle_index, 9) = std::pow(difference[1], 3);
+//
+//            A(particle_index, 10) = std::pow(difference[0], 4);
+//            A(particle_index, 11) = std::pow(difference[0], 3) * difference[1];
+//            A(particle_index, 12) = std::pow(difference[0] * difference[1], 2);
+//            A(particle_index, 13) = difference[0] * std::pow(difference[1], 3);
+//            A(particle_index, 14) = std::pow(difference[1], 4);
+//
+//            A(particle_index, 15) = std::pow(difference[0], 5);
+//            A(particle_index, 16) = std::pow(difference[0], 4) * difference[1];
+//            A(particle_index, 17) = std::pow(difference[0], 3) * std::pow( difference[1], 2);
+//            A(particle_index, 18) = std::pow(difference[0], 2) * std::pow( difference[1], 3);
+//            A(particle_index, 19) = difference[0] * std::pow(difference[1], 4);
+//            A(particle_index, 20) = std::pow(difference[1], 5);
+//
+//            A(particle_index, 21) = std::pow(difference[0], 6);
+//            A(particle_index, 22) = std::pow(difference[0], 5) * difference[1];
+//            A(particle_index, 23) = std::pow(difference[0], 4) * std::pow( difference[1], 2);
+//            A(particle_index, 24) = std::pow(difference[0] * difference[1], 3);
+//            A(particle_index, 25) = std::pow(difference[0], 2) * std::pow( difference[1], 4);
+//            A(particle_index, 26) = difference[0] * std::pow(difference[1], 5);
+//            A(particle_index, 27) = std::pow(difference[1], 6);
+
             for (std::size_t index = 0; index < n_particles; ++index)
               W(particle_index,index) = (particle_index == index)? weighting : 0;
 
           }
         }
-
         dealii::LAPACKFullMatrix<double> ATW(matrix_dimension, n_particles);
         dealii::LAPACKFullMatrix<double>ATWA(matrix_dimension, matrix_dimension);
         A.Tmmult(ATW, W);
@@ -285,6 +316,11 @@ template<>
         // c = inv((A^T)WA)(A^T)Wf
 
         constexpr unsigned int matrix_dimension = 10; // 1, x, y , z // x^2, y^2, z^2, xy, xz, yz
+        AssertThrow(n_particles > matrix_dimension,
+                    ExcMessage("The moving bilinear least squares particle"
+                               " interpolator was called without enough particles"
+                               " to interpolate from, pleas re-run with more "
+                               "particles, or with more neighbors"));
         dealii::LAPACKFullMatrix<double> A(n_particles, matrix_dimension);
         dealii::LAPACKFullMatrix<double> W(n_particles);
         dealii::Vector<double> Wf(n_particles);
@@ -370,8 +406,8 @@ template<>
         {
           prm.enter_subsection("Particles");
           {
-            phi_scaling = prm.get_double("Moving least squares radius");
-            //neighbor_usage = static_cast<NeighboringCellChoice>(prm.get_integer("Use neighboring cells for particle interpolation"));
+            r = prm.get_double("Moving least squares radius");
+            neighbor_usage = static_cast<NeighboringCellChoice>(prm.get_integer("Use neighboring cells for particle interpolation"));
           }
           prm.leave_subsection();
         }
@@ -379,29 +415,31 @@ template<>
       }
 
       template<int dim>
-      double MovingBilinearLeastSquares<dim>::phi(double r) const
+      double MovingBilinearLeastSquares<dim>::phi(double difference) const
       {
         // This function implements equation 6.27 from C.S. Peskin's 2002
         // Immersed Boundary method, published in Volume 11 of Acta Numerica
-        r *= 2 / phi_scaling;
-        if (r >= 2 || r <= -2)
+        //r *= 2 / phi_scaling;
+        double v = difference / r;
+        if (v >= 2 || v <= -2)
           return 0;
-        else if (r <= -1)
-          return (5 + 2 * r - std::sqrt(-7 - 12 * r - 4 * std::pow(r, 2))) / 8;
-        else if (r <= 0)
-          return (3 + 2 * r + std::sqrt(1 - 4 * r - 4 * std::pow(r, 2))) / 8;
-        else if (r <= 1)
-          return (3 - 2 * r + std::sqrt(1 + 4 * r - 4 * std::pow(r, 2))) / 8;
-        else // (r <= 2)
-          return (5 - 2 * r - std::sqrt(- 7 + 12 * r - 4 * std::pow(r, 2))) / 8;
+        else if (v <= -1)
+          return (5 + 2 * v - std::sqrt(-7 - 12 * v - 4 * std::pow(v, 2))) / 8;
+        else if (v <= 0)
+          return (3 + 2 * v + std::sqrt(1 - 4 * v - 4 * std::pow(v, 2))) / 8;
+        else if (v <= 1)
+          return (3 - 2 * v + std::sqrt(1 + 4 * v - 4 * std::pow(v, 2))) / 8;
+        else // (v <= 2)
+          return (5 - 2 * v - std::sqrt(- 7 + 12 * v - 4 * std::pow(v, 2))) / 8;
       }
 
       template<int dim>
-      double MovingBilinearLeastSquares<dim>::dirac_delta_h(const Tensor<1, dim, double>& x, double cell_diameter) const
+      double MovingBilinearLeastSquares<dim>::dirac_delta_h(const Tensor<1, dim, double>& difference, double cell_diameter) const
       {
-        double value = 1 /std::pow(cell_diameter, dim);
+        double value;
+        value = 1 /std::pow(cell_diameter * r, dim);
         for (int coordinate = 0; coordinate < dim; ++coordinate)
-          value *= phi(x[coordinate]);
+          value *= phi(difference[coordinate]);
         return value;
       }
 
