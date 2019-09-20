@@ -74,6 +74,7 @@ namespace aspect
            * and global min for each propery.
            */
           bool use_global_valued_limiter;
+          unsigned int alpha_iterations;
 
           /**
            * For each interpolated particle property, a global max and global
