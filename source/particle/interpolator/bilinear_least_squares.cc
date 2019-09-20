@@ -19,6 +19,7 @@
  */
 
 #include <aspect/particle/interpolator/bilinear_least_squares.h>
+#include <aspect/particle/interpolator/cell_average.h>
 #include <aspect/postprocess/particles.h>
 #include <aspect/simulator.h>
 
@@ -48,9 +49,6 @@ namespace aspect
         AssertThrow(property_index != numbers::invalid_unsigned_int,
                     ExcMessage("Internal error: the particle property interpolator was "
                                "called without a specified component to interpolate."));
-
-        AssertThrow(dim == 2,
-                    ExcMessage("Currently, the particle interpolator `bilinear' is only supported for 2D models."));
 
         AssertThrow(selected_properties.n_selected_components(n_particle_properties) == 1,
                     ExcNotImplemented("Interpolation of multiple components is not supported."));
@@ -86,6 +84,7 @@ namespace aspect
         std::vector<std::vector<double> > cell_properties(positions.size(),
                                                           std::vector<double>(n_particle_properties,
                                                                               numbers::signaling_nan<double>()));
+        bool cell_has_overshot_or_undershot = false;
 
         const unsigned int n_particles = std::distance(particle_range.begin(),particle_range.end());
 
@@ -97,7 +96,7 @@ namespace aspect
         // Noticed that the size of matrix A is n_particles x matrix_dimension
         // which usually is not a square matrix. Therefore, we solve Ax=r by
         // solving A^TAx= A^Tr.
-        const unsigned int matrix_dimension = 4;
+        const unsigned int matrix_dimension = (dim == 2) ? 3: 4;
         dealii::LAPACKFullMatrix<double> A(n_particles, matrix_dimension);
         Vector<double> r(n_particles);
         r = 0;
@@ -110,11 +109,22 @@ namespace aspect
             const double particle_property_value = particle->get_properties()[property_index];
             r[index] = particle_property_value;
 
-            const Point<dim> particle_position = particle->get_location();
+            const Tensor<1, dim, double> relative_particle_position = (particle->get_location() - approximated_cell_midpoint) / cell_diameter;
             A(index,0) = 1;
-            A(index,1) = (particle_position[0] - approximated_cell_midpoint[0])/cell_diameter;
-            A(index,2) = (particle_position[1] - approximated_cell_midpoint[1])/cell_diameter;
-            A(index,3) = (particle_position[0] - approximated_cell_midpoint[0]) * (particle_position[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
+            A(index, 1) = relative_particle_position[0];
+            A(index, 2) = relative_particle_position[1];
+            //if (dim == 2)
+            //  {
+            //    A(index, 3) = relative_particle_position[0] * relative_particle_position[1];
+            //  }
+            //else
+            //  {
+            if (dim ==3)
+                A(index, 3) = relative_particle_position[2];
+            //    A(index, 4) = relative_particle_position[0] * relative_particle_position[1];
+            //    A(index, 5) = relative_particle_position[0] * relative_particle_position[2];
+            //    A(index, 6) = relative_particle_position[1] * relative_particle_position[2];
+            // }
           }
 
         dealii::LAPACKFullMatrix<double> B(matrix_dimension, matrix_dimension);
@@ -135,25 +145,80 @@ namespace aspect
         B_inverse.compute_inverse_svd(threshold);
         B_inverse.vmult(c, c_ATr);
 
-        for (typename std::vector<Point<dim> >::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
-          {
-            const Point<dim> support_point = *itr;
-            double interpolated_value = c[0] +
-                                        c[1]*(support_point[0] - approximated_cell_midpoint[0])/cell_diameter +
-                                        c[2]*(support_point[1] - approximated_cell_midpoint[1])/cell_diameter +
-                                        c[3]*(support_point[0] - approximated_cell_midpoint[0])*(support_point[1] - approximated_cell_midpoint[1])/std::pow(cell_diameter,2);
+        for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
+        {
+          const Tensor<1, dim, double> relative_support_point_location = (*itr - approximated_cell_midpoint) / cell_diameter;
+          double initial_interpolated_value = c[0] +
+                                              c[1] * relative_support_point_location[0] +
+                                              c[2] * relative_support_point_location[1];
+           // if (dim == 2)
+           //   {
+           //    interpolated_value += c[3] * relative_support_point_location[0] * relative_support_point_location[1];
+            //  }
+            //else
+            //  {
+          if (dim == 3)
+            initial_interpolated_value += c[3] * relative_support_point_location[2];
+           
+            
+            //initial_interpolated_value += c[3] * relative_support_point_location[0] * relative_support_point_location[1];
+            //                          c[5] * relative_support_point_location[0] * relative_support_point_location[2] +
+            //                          c[6] * relative_support_point_location[1] * relative_support_point_location[2];
+            //  }
 
+          double interpolated_value = initial_interpolated_value;
             // Overshoot and undershoot correction of interpolated particle property.
-            if (use_global_valued_limiter)
-              {
-                interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
-                interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
-              }
-
-            cell_properties[index_positions][property_index] = interpolated_value;
+          if (use_global_valued_limiter)
+          {
+            interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
+            interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
+            cell_has_overshot_or_undershot = cell_has_overshot_or_undershot || (interpolated_value == initial_interpolated_value);
           }
+          cell_properties[index_positions][property_index] = interpolated_value;
+        }
+
+        if (cell_has_overshot_or_undershot)
+        {
+          CellAverage<dim> cell_average_interpolator;
+          const std::vector<std::vector<double>> cell_average_results = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell);
+          double lower_alpha_range = 0;
+          double upper_alpha_range = 1;
+          double last_valid_alpha = 0;
+          
+          for (unsigned int i = 0; i < alpha_iterations; ++i)
+          {
+            bool out_of_constraint = false;
+            double alpha_guess = (upper_alpha_range + lower_alpha_range) / 2;
+            for (unsigned int positions_index = 0; positions_index < positions.size(); ++positions_index)
+            {
+              double value = alpha_guess*cell_properties[positions_index][property_index] + (1 - alpha_guess) * cell_average_results[positions_index][property_index];
+              if (value < global_minimum_particle_properties[property_index] || value > global_maximum_particle_properties[property_index])
+              {
+                out_of_constraint = true;
+                break;
+              }
+            }
+            if (out_of_constraint)
+            {
+              upper_alpha_range = alpha_guess;
+            }
+            else
+            {
+              lower_alpha_range = alpha_guess;
+              last_valid_alpha = std::max(last_valid_alpha, alpha_guess);
+            }
+
+          }
+        for (unsigned int positions_index = 0; positions_index < positions.size(); ++positions_index)
+          cell_properties[positions_index][property_index] = last_valid_alpha * cell_properties[positions_index][property_index] + (1 - last_valid_alpha) * cell_average_results[positions_index][property_index];
+        
+        }
+
+
         return cell_properties;
       }
+
+
 
       template <int dim>
       void
@@ -185,6 +250,15 @@ namespace aspect
                                   Patterns::Bool (),
                                   "Whether to apply a global particle property limiting scheme to the interpolated "
                                   "particle properties.");
+                prm.declare_entry ("Limiter iterations",
+                                   "10",
+                                   Patterns::Integer(0, 100),
+                                   "The minimum global particle property that will be used as a "
+                                   "limiter for the bilinear least squares interpolation. The number must "
+                                   "between 0, and 54. 0 would mean that if the bilinear least squares "
+                                   "interpolator undershot or overshot, that it would fall back to cell "
+                                   "average. 54, means that it will combine the cell average and bilinear"
+                                   " least squares until no value in the cell over or undershoots");
 
               }
               prm.leave_subsection();
@@ -225,6 +299,7 @@ namespace aspect
                     AssertThrow(global_maximum_particle_properties.size() == n_property_components,
                                 ExcMessage("Make sure that the size of list 'Global maximum particle property' "
                                            "is equivalent to the number of particle properties."));
+                    alpha_iterations = prm.get_integer("Limiter iterations");
                   }
               }
               prm.leave_subsection();
