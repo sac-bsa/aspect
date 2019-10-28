@@ -217,15 +217,6 @@ namespace aspect
                                   Patterns::Bool (),
                                   "Whether to apply a global particle property limiting scheme to the interpolated "
                                   "particle properties.");
-                prm.declare_entry ("Limiter iterations",
-                                   "10",
-                                   Patterns::Integer(0, 100),
-                                   "The minimum global particle property that will be used as a "
-                                   "limiter for the biquadratic least squares interpolation. The number must "
-                                   "between 0, and 54. 0 would mean that if the biquadratic least squares "
-                                   "interpolator undershot or overshot, that it would fall back to cell "
-                                   "average. 54, means that it will combine the cell average and biquadratic"
-                                   " least squares until no value in the cell over or undershoots");
 
               }
               prm.leave_subsection();
@@ -266,7 +257,6 @@ namespace aspect
                     AssertThrow(global_maximum_particle_properties.size() == n_property_components,
                                 ExcMessage("Make sure that the size of list 'Global maximum particle property' "
                                            "is equivalent to the number of particle properties."));
-                    alpha_iterations = prm.get_integer("Limiter iterations");
                   }
               }
               prm.leave_subsection();
