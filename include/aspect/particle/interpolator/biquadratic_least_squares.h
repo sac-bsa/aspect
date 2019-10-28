@@ -68,7 +68,6 @@ namespace aspect
           parse_parameters (ParameterHandler &prm);
 
         private:
-          unsigned int alpha_iterations;
           /**
            * Variables related to a limiting scheme that prevents overshoot and
            * undershoot of interpolated particle properties based on global max

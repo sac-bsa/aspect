@@ -118,10 +118,6 @@ namespace aspect
             A(index, 3) = std::pow(relative_particle_position[0], 2);
             A(index, 4) = relative_particle_position[0] * relative_particle_position[1];
             A(index, 5) = std::pow(relative_particle_position[1], 2);
-            /*A(index, 6) = std::pow(relative_particle_position[0], 2) * relative_particle_position[1];
-            A(index, 7) = relative_particle_position[0] * std::pow(relative_particle_position[1], 2);
-            A(index, 8) = std::pow(relative_particle_position[0] * relative_particle_position[1], 2);*/
-
 
           }
           else
@@ -133,10 +129,6 @@ namespace aspect
             A(index, 7) = std::pow(relative_particle_position[1], 2);
             A(index, 8) = relative_particle_position[1] * relative_particle_position[2];
             A(index, 9) = std::pow(relative_particle_position[1], 2);
-            /*A(index, 10) = std::pow(relative_particle_position[0], 2) * relative_particle_position[1];
-            A(index, 11) = relative_particle_position[0] * std::pow(relative_particle_position[1], 2);
-            A(index, 12) = std::pow(relative_particle_position[0] * relative_particle_position[1], 2);*/
-
 
           }
         }
@@ -167,67 +159,22 @@ namespace aspect
                                               c[2] * relative_support_point_location[1];
           if (dim == 2)
           {
-            initial_interpolated_value += c[3] * std::pow(relative_support_point_location[0], 2) +
-                                          c[4] * relative_support_point_location[0] * relative_support_point_location[1] +
-                                          c[5] * std::pow(relative_support_point_location[1], 2);
+            initial_interpolated_value += c[3] * relative_support_point_location[0] * relative_support_point_location[1];
           }
           else
           {
             initial_interpolated_value += c[3] * relative_support_point_location[2] +
-                                          c[4] * std::pow(relative_support_point_location[0], 2) +
-                                          c[5] * relative_support_point_location[0] * relative_support_point_location[1] +
-                                          c[6] * relative_support_point_location[0] * relative_support_point_location[2] +
-                                          c[7] * std::pow(relative_support_point_location[1], 2) +
-                                          c[8] * relative_support_point_location[1] * relative_support_point_location[2] +
-                                          c[9] * std::pow(relative_support_point_location[2], 2);
+                                          c[4] * relative_support_point_location[0] * relative_support_point_location[1] +
+                                          c[5] * relative_support_point_location[0] * relative_support_point_location[2] +
+                                          c[6] * relative_support_point_location[1] * relative_support_point_location[2];
           }
           // Overshoot and undershoot correction of interpolated particle property.
           if (use_global_valued_limiter)
           {
-            if (initial_interpolated_value > global_maximum_particle_properties[property_index] || initial_interpolated_value < global_minimum_particle_properties[property_index])
-              cell_has_overshot_or_undershot = true;
-
-//            interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
-//            interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
+            interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
+            interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
           }
           cell_properties[index_positions][property_index] = initial_interpolated_value;
-        }
-
-        if (cell_has_overshot_or_undershot)
-        {
-          CellAverage<dim> cell_average_interpolator;
-          const std::vector<std::vector<double>> cell_average_results = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell);
-          double lower_alpha_range = 0;
-          double upper_alpha_range = 1;
-          double last_valid_alpha = 0;
-
-          for (unsigned int i = 0; i < alpha_iterations; ++i)
-          {
-            bool out_of_constraint = false;
-            double alpha_guess = (upper_alpha_range + lower_alpha_range) / 2;
-            for (unsigned int positions_index = 0; positions_index < positions.size(); ++positions_index)
-            {
-              double value = alpha_guess * cell_properties[positions_index][property_index] + (1 - alpha_guess) * cell_average_results[positions_index][property_index];
-              if (value < global_minimum_particle_properties[property_index] || value > global_maximum_particle_properties[property_index])
-              {
-                out_of_constraint = true;
-                break;
-              }
-            }
-            if (out_of_constraint)
-            {
-              upper_alpha_range = alpha_guess;
-            }
-            else
-            {
-              lower_alpha_range = alpha_guess;
-              last_valid_alpha = std::max(last_valid_alpha, alpha_guess);
-            }
-
-          }
-          for (unsigned int positions_index = 0; positions_index < positions.size(); ++positions_index)
-            cell_properties[positions_index][property_index] = last_valid_alpha * cell_properties[positions_index][property_index] + (1 - last_valid_alpha) * cell_average_results[positions_index][property_index];
-
         }
 
 
