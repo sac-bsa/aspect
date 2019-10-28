@@ -60,31 +60,30 @@ namespace aspect
         typename parallel::distributed::Triangulation<dim>::active_cell_iterator found_cell;
 
         if (cell == typename parallel::distributed::Triangulation<dim>::active_cell_iterator())
-        {
-          // We can not simply use one of the points as input for find_active_cell_around_point
-          // because for vertices of mesh cells we might end up getting ghost_cells as return value
-          // instead of the local active cell. So make sure we are well in the inside of a cell.
-          Assert(positions.size() > 0,
-                 ExcMessage("The particle property interpolator was not given any "
-                            "positions to evaluate the particle cell_properties at."));
+          {
+            // We can not simply use one of the points as input for find_active_cell_around_point
+            // because for vertices of mesh cells we might end up getting ghost_cells as return value
+            // instead of the local active cell. So make sure we are well in the inside of a cell.
+            Assert(positions.size() > 0,
+                   ExcMessage("The particle property interpolator was not given any "
+                              "positions to evaluate the particle cell_properties at."));
 
 
-          found_cell =
-                  (GridTools::find_active_cell_around_point<> (this->get_mapping(),
-                                                               this->get_triangulation(),
-                                                               approximated_cell_midpoint)).first;
-        }
+            found_cell =
+              (GridTools::find_active_cell_around_point<> (this->get_mapping(),
+                                                           this->get_triangulation(),
+                                                           approximated_cell_midpoint)).first;
+          }
         else
           found_cell = cell;
 
         const typename ParticleHandler<dim>::particle_iterator_range particle_range =
-                particle_handler.particles_in_cell(found_cell);
+          particle_handler.particles_in_cell(found_cell);
 
 
         std::vector<std::vector<double> > cell_properties(positions.size(),
                                                           std::vector<double>(n_particle_properties,
                                                                               numbers::signaling_nan<double>()));
-        bool cell_has_overshot_or_undershot = false;
 
         const unsigned int n_particles = std::distance(particle_range.begin(),particle_range.end());
 
@@ -105,33 +104,33 @@ namespace aspect
         const double cell_diameter = found_cell->diameter();
         for (typename ParticleHandler<dim>::particle_iterator particle = particle_range.begin();
              particle != particle_range.end(); ++particle, ++index)
-        {
-          const double particle_property_value = particle->get_properties()[property_index];
-          r[index] = particle_property_value;
-
-          const Tensor<1, dim, double> relative_particle_position = (particle->get_location() - approximated_cell_midpoint) / cell_diameter;
-          A(index,0) = 1;
-          A(index, 1) = relative_particle_position[0];
-          A(index, 2) = relative_particle_position[1];
-          if (dim == 2)
           {
-            A(index, 3) = std::pow(relative_particle_position[0], 2);
-            A(index, 4) = relative_particle_position[0] * relative_particle_position[1];
-            A(index, 5) = std::pow(relative_particle_position[1], 2);
+            const double particle_property_value = particle->get_properties()[property_index];
+            r[index] = particle_property_value;
 
-          }
-          else
-          {
-            A(index, 3) = relative_particle_position[2];
-            A(index, 4) = std::pow(relative_particle_position[0], 2);
-            A(index, 5) = relative_particle_position[0] * relative_particle_position[1];
-            A(index, 6) = relative_particle_position[0] * relative_particle_position[2];
-            A(index, 7) = std::pow(relative_particle_position[1], 2);
-            A(index, 8) = relative_particle_position[1] * relative_particle_position[2];
-            A(index, 9) = std::pow(relative_particle_position[1], 2);
+            const Tensor<1, dim, double> relative_particle_position = (particle->get_location() - approximated_cell_midpoint) / cell_diameter;
+            A(index, 0) = 1;
+            A(index, 1) = relative_particle_position[0];
+            A(index, 2) = relative_particle_position[1];
+            if (dim == 2)
+              {
+                A(index, 3) = std::pow(relative_particle_position[0], 2);
+                A(index, 4) = relative_particle_position[0] * relative_particle_position[1];
+                A(index, 5) = std::pow(relative_particle_position[1], 2);
 
+              }
+            else
+              {
+                A(index, 3) = relative_particle_position[2];
+                A(index, 4) = std::pow(relative_particle_position[0], 2);
+                A(index, 5) = relative_particle_position[0] * relative_particle_position[1];
+                A(index, 6) = relative_particle_position[0] * relative_particle_position[2];
+                A(index, 7) = std::pow(relative_particle_position[1], 2);
+                A(index, 8) = relative_particle_position[1] * relative_particle_position[2];
+                A(index, 9) = std::pow(relative_particle_position[1], 2);
+
+              }
           }
-        }
 
         dealii::LAPACKFullMatrix<double> B(matrix_dimension, matrix_dimension);
 
@@ -152,30 +151,35 @@ namespace aspect
         B_inverse.vmult(c, c_ATr);
 
         for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
-        {
-          const Tensor<1, dim, double> relative_support_point_location = (*itr - approximated_cell_midpoint) / cell_diameter;
-          double initial_interpolated_value = c[0] +
-                                              c[1] * relative_support_point_location[0] +
-                                              c[2] * relative_support_point_location[1];
-          if (dim == 2)
           {
-            initial_interpolated_value += c[3] * relative_support_point_location[0] * relative_support_point_location[1];
+            const Tensor<1, dim, double> relative_support_point_location = (*itr - approximated_cell_midpoint) / cell_diameter;
+            double interpolated_value = c[0] +
+                                        c[1] * relative_support_point_location[0] +
+                                        c[2] * relative_support_point_location[1];
+            if (dim == 2)
+              {
+                interpolated_value += c[3] * std::pow(relative_support_point_location[0], 2) +
+                                      c[4] * relative_support_point_location[0] * relative_support_point_location[1] +
+                                      c[5] * std::pow(relative_support_point_location[1], 2);
+              }
+            else
+              {
+                interpolated_value += c[3] * relative_support_point_location[2] +
+                                      c[4] * std::pow(relative_support_point_location[0], 2) +
+                                      c[5] * relative_support_point_location[0] * relative_support_point_location[1] +
+                                      c[6] * relative_support_point_location[0] * relative_support_point_location[2] +
+                                      c[7] * std::pow(relative_support_point_location[1], 2) +
+                                      c[8] * relative_support_point_location[1] * relative_support_point_location[2] +
+                                      c[9] * std::pow(relative_support_point_location[2], 2);
+              }
+            // Overshoot and undershoot correction of interpolated particle property.
+            if (use_global_valued_limiter)
+              {
+                interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
+                interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
+              }
+            cell_properties[index_positions][property_index] = interpolated_value;
           }
-          else
-          {
-            initial_interpolated_value += c[3] * relative_support_point_location[2] +
-                                          c[4] * relative_support_point_location[0] * relative_support_point_location[1] +
-                                          c[5] * relative_support_point_location[0] * relative_support_point_location[2] +
-                                          c[6] * relative_support_point_location[1] * relative_support_point_location[2];
-          }
-          // Overshoot and undershoot correction of interpolated particle property.
-          if (use_global_valued_limiter)
-          {
-            interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
-            interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
-          }
-          cell_properties[index_positions][property_index] = initial_interpolated_value;
-        }
 
 
         return cell_properties;
@@ -247,23 +251,23 @@ namespace aspect
               {
                 use_global_valued_limiter = prm.get_bool("Use limiter");
                 if (use_global_valued_limiter)
-                {
-                  global_maximum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property maximum")));
-                  global_minimum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property minimum")));
+                  {
+                    global_maximum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property maximum")));
+                    global_minimum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property minimum")));
 
-                  const Postprocess::Particles<dim> &particle_postprocessor =
-                          this->get_postprocess_manager().template get_matching_postprocessor<const Postprocess::Particles<dim> >();
-                  const unsigned int n_property_components = particle_postprocessor.get_particle_world().get_property_manager().get_n_property_components();
+                    const Postprocess::Particles<dim> &particle_postprocessor =
+                      this->get_postprocess_manager().template get_matching_postprocessor<const Postprocess::Particles<dim> >();
+                    const unsigned int n_property_components = particle_postprocessor.get_particle_world().get_property_manager().get_n_property_components();
 
-                  AssertThrow(global_minimum_particle_properties.size() == n_property_components,
-                              ExcMessage("Make sure that the size of list 'Global minimum particle property' "
-                                         "is equivalent to the number of particle properties."));
+                    AssertThrow(global_minimum_particle_properties.size() == n_property_components,
+                                ExcMessage("Make sure that the size of list 'Global minimum particle property' "
+                                           "is equivalent to the number of particle properties."));
 
-                  AssertThrow(global_maximum_particle_properties.size() == n_property_components,
-                              ExcMessage("Make sure that the size of list 'Global maximum particle property' "
-                                         "is equivalent to the number of particle properties."));
-                  alpha_iterations = prm.get_integer("Limiter iterations");
-                }
+                    AssertThrow(global_maximum_particle_properties.size() == n_property_components,
+                                ExcMessage("Make sure that the size of list 'Global maximum particle property' "
+                                           "is equivalent to the number of particle properties."));
+                    alpha_iterations = prm.get_integer("Limiter iterations");
+                  }
               }
               prm.leave_subsection();
             }
