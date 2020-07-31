@@ -126,7 +126,7 @@ namespace aspect
                 A(positions_index, 6) = relative_particle_position[1] * relative_particle_position[2];
                 A(positions_index, 7) = std::pow(relative_particle_position[0], 2);
                 A(positions_index, 8) = std::pow(relative_particle_position[1], 2);
-                A(positions_index, 9) = std::pow(relative_particle_position[2], 2); 
+                A(positions_index, 9) = std::pow(relative_particle_position[2], 2);
               }
           }
 
@@ -171,7 +171,7 @@ namespace aspect
                                           c[property_index][4] * relative_support_point_location[0] * relative_support_point_location[1] +
                                           c[property_index][5] * relative_support_point_location[0] * relative_support_point_location[2] +
                                           c[property_index][6] * relative_support_point_location[1] * relative_support_point_location[2] +
-                                          c[property_index][7] * std::pow(relative_support_point_location[0], 2) +  
+                                          c[property_index][7] * std::pow(relative_support_point_location[0], 2) +
                                           c[property_index][8] * std::pow(relative_support_point_location[1], 2) +
                                           c[property_index][9] * std::pow(relative_support_point_location[2], 2);
                   }

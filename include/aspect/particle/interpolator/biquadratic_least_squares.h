@@ -79,7 +79,7 @@ namespace aspect
            */
           std::vector<double> global_maximum_particle_properties;
           std::vector<double> global_minimum_particle_properties;
-          
+
       };
     }
   }

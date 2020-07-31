@@ -39,9 +39,9 @@ namespace aspect
       template <int dim>
       std::vector<std::vector<double> >
       BiquadraticSVDLeastSquares<dim>::properties_at_points(const ParticleHandler<dim> &particle_handler,
-                                                      const std::vector<Point<dim> > &positions,
-                                                      const ComponentMask &selected_properties,
-                                                      const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
+                                                            const std::vector<Point<dim> > &positions,
+                                                            const ComponentMask &selected_properties,
+                                                            const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
       {
         const unsigned int n_particle_properties = particle_handler.n_properties_per_particle();
 
@@ -128,7 +128,7 @@ namespace aspect
                 A(positions_index, 6) = relative_particle_position[1] * relative_particle_position[2];
                 A(positions_index, 7) = std::pow(relative_particle_position[0], 2);
                 A(positions_index, 8) = std::pow(relative_particle_position[1], 2);
-                A(positions_index, 9) = std::pow(relative_particle_position[2], 2); 
+                A(positions_index, 9) = std::pow(relative_particle_position[2], 2);
 
               }
 
@@ -145,24 +145,27 @@ namespace aspect
         A.compute_svd();
         std::vector<Vector<double>> UTb(n_particle_properties, Vector<double>(n_particles));
         std::vector<Vector<double>> temp_name(n_particle_properties, Vector<double>(matrix_dimension));
-                
+
         unsigned int effective_rank = 1;
-        while (effective_rank < n_particles && A.singular_value(effective_rank + 1) >= std::max(A.m(), A.n()) * threshold * A.singular_value(1)) {
-          ++effective_rank;
-        }
+        while (effective_rank < n_particles && A.singular_value(effective_rank + 1) >= std::max(A.m(), A.n()) * threshold * A.singular_value(1))
+          {
+            ++effective_rank;
+          }
 
         for (unsigned int property_index = 0; property_index < n_particle_properties; ++property_index)
           {
             if (selected_properties[property_index])
               {
                 A.get_svd_u().Tvmult(UTb[property_index], b[property_index]);
-                for (unsigned int value = 0; value < effective_rank; ++value) {
-                  temp_name[property_index][value] = UTb[property_index][value] / A.singular_value(value);
-                }
-                for (unsigned int value = effective_rank; value < matrix_dimension; ++value) {
-                  temp_name[property_index][value] = 0;
-                } 
-                A.get_svd_vt().Tvmult(c[property_index], temp_name[property_index]); 
+                for (unsigned int value = 0; value < effective_rank; ++value)
+                  {
+                    temp_name[property_index][value] = UTb[property_index][value] / A.singular_value(value);
+                  }
+                for (unsigned int value = effective_rank; value < matrix_dimension; ++value)
+                  {
+                    temp_name[property_index][value] = 0;
+                  }
+                A.get_svd_vt().Tvmult(c[property_index], temp_name[property_index]);
               }
           }
         for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
@@ -185,7 +188,7 @@ namespace aspect
                                           c[property_index][4] * relative_support_point_location[0] * relative_support_point_location[1] +
                                           c[property_index][5] * relative_support_point_location[0] * relative_support_point_location[2] +
                                           c[property_index][6] * relative_support_point_location[1] * relative_support_point_location[2] +
-                                          c[property_index][7] * std::pow(relative_support_point_location[0], 2) +  
+                                          c[property_index][7] * std::pow(relative_support_point_location[0], 2) +
                                           c[property_index][8] * std::pow(relative_support_point_location[1], 2) +
                                           c[property_index][9] * std::pow(relative_support_point_location[2], 2);
 

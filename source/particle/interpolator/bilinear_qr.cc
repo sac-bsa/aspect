@@ -187,42 +187,42 @@ namespace aspect
       void
       BilinearQRLeastSquares<dim>::declare_parameters (ParameterHandler &prm)
       {
-       /* prm.enter_subsection("Postprocess");
-        {
-          prm.enter_subsection("Particles");
-          {
-            prm.enter_subsection("Interpolator");
-            {
-              prm.enter_subsection("Bilinear least squares");
-              {
-                prm.declare_entry ("Global particle property maximum",
-                                   boost::lexical_cast<std::string>(std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The maximum global particle property values that will be used as a "
-                                   "limiter for the bilinear least squares interpolation. The number of the input "
-                                   "'Global particle property maximum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry ("Global particle property minimum",
-                                   boost::lexical_cast<std::string>(-std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The minimum global particle property that will be used as a "
-                                   "limiter for the bilinear least squares interpolation. The number of the input "
-                                   "'Global particle property minimum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry("Use limiter", "false",
-                                  Patterns::Bool (),
-                                  "Whether to apply a global particle property limiting scheme to the interpolated "
-                                  "particle properties.");
+        /* prm.enter_subsection("Postprocess");
+         {
+           prm.enter_subsection("Particles");
+           {
+             prm.enter_subsection("Interpolator");
+             {
+               prm.enter_subsection("Bilinear least squares");
+               {
+                 prm.declare_entry ("Global particle property maximum",
+                                    boost::lexical_cast<std::string>(std::numeric_limits<double>::max()),
+                                    Patterns::List(Patterns::Double ()),
+                                    "The maximum global particle property values that will be used as a "
+                                    "limiter for the bilinear least squares interpolation. The number of the input "
+                                    "'Global particle property maximum' values separated by ',' has to be "
+                                    "the same as the number of particle properties.");
+                 prm.declare_entry ("Global particle property minimum",
+                                    boost::lexical_cast<std::string>(-std::numeric_limits<double>::max()),
+                                    Patterns::List(Patterns::Double ()),
+                                    "The minimum global particle property that will be used as a "
+                                    "limiter for the bilinear least squares interpolation. The number of the input "
+                                    "'Global particle property minimum' values separated by ',' has to be "
+                                    "the same as the number of particle properties.");
+                 prm.declare_entry("Use limiter", "false",
+                                   Patterns::Bool (),
+                                   "Whether to apply a global particle property limiting scheme to the interpolated "
+                                   "particle properties.");
 
-              }
-              prm.leave_subsection();
-            }
-            prm.leave_subsection();
-          }
-          prm.leave_subsection();
-        }
-        prm.leave_subsection();
-        */
+               }
+               prm.leave_subsection();
+             }
+             prm.leave_subsection();
+           }
+           prm.leave_subsection();
+         }
+         prm.leave_subsection();
+         */
       }
 
       template <int dim>

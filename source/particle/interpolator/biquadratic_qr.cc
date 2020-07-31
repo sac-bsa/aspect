@@ -36,9 +36,9 @@ namespace aspect
       template <int dim>
       std::vector<std::vector<double> >
       BiquadraticQRLeastSquares<dim>::properties_at_points(const ParticleHandler<dim> &particle_handler,
-                                                        const std::vector<Point<dim> > &positions,
-                                                        const ComponentMask &selected_properties,
-                                                        const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
+                                                           const std::vector<Point<dim> > &positions,
+                                                           const ComponentMask &selected_properties,
+                                                           const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
       {
         const unsigned int n_particle_properties = particle_handler.n_properties_per_particle();
 
@@ -162,7 +162,7 @@ namespace aspect
                 if (dim == 2)
                   {
                     interpolated_value += c[property_index][3] * relative_support_point_location[0] * relative_support_point_location[1] +
-                                          c[property_index][4] * std::pow(relative_support_point_location[0], 2) + 
+                                          c[property_index][4] * std::pow(relative_support_point_location[0], 2) +
                                           c[property_index][5] * std::pow(relative_support_point_location[1], 2);
                   }
                 else
@@ -195,42 +195,42 @@ namespace aspect
       void
       BiquadraticQRLeastSquares<dim>::declare_parameters (ParameterHandler &prm)
       {
-       /* prm.enter_subsection("Postprocess");
-        {
-          prm.enter_subsection("Particles");
-          {
-            prm.enter_subsection("Interpolator");
-            {
-              prm.enter_subsection("Biquadratic least squares");
-              {
-                prm.declare_entry ("Global particle property maximum",
-                                   boost::lexical_cast<std::string>(std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The maximum global particle property values that will be used as a "
-                                   "limiter for the biquadratic least squares interpolation. The number of the input "
-                                   "'Global particle property maximum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry ("Global particle property minimum",
-                                   boost::lexical_cast<std::string>(-std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The minimum global particle property that will be used as a "
-                                   "limiter for the biquadratic least squares interpolation. The number of the input "
-                                   "'Global particle property minimum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry("Use limiter", "false",
-                                  Patterns::Bool (),
-                                  "Whether to apply a global particle property limiting scheme to the interpolated "
-                                  "particle properties.");
+        /* prm.enter_subsection("Postprocess");
+         {
+           prm.enter_subsection("Particles");
+           {
+             prm.enter_subsection("Interpolator");
+             {
+               prm.enter_subsection("Biquadratic least squares");
+               {
+                 prm.declare_entry ("Global particle property maximum",
+                                    boost::lexical_cast<std::string>(std::numeric_limits<double>::max()),
+                                    Patterns::List(Patterns::Double ()),
+                                    "The maximum global particle property values that will be used as a "
+                                    "limiter for the biquadratic least squares interpolation. The number of the input "
+                                    "'Global particle property maximum' values separated by ',' has to be "
+                                    "the same as the number of particle properties.");
+                 prm.declare_entry ("Global particle property minimum",
+                                    boost::lexical_cast<std::string>(-std::numeric_limits<double>::max()),
+                                    Patterns::List(Patterns::Double ()),
+                                    "The minimum global particle property that will be used as a "
+                                    "limiter for the biquadratic least squares interpolation. The number of the input "
+                                    "'Global particle property minimum' values separated by ',' has to be "
+                                    "the same as the number of particle properties.");
+                 prm.declare_entry("Use limiter", "false",
+                                   Patterns::Bool (),
+                                   "Whether to apply a global particle property limiting scheme to the interpolated "
+                                   "particle properties.");
 
-              }
-              prm.leave_subsection();
-            }
-            prm.leave_subsection();
-          }
-          prm.leave_subsection();
-        }
-        prm.leave_subsection();
-        */
+               }
+               prm.leave_subsection();
+             }
+             prm.leave_subsection();
+           }
+           prm.leave_subsection();
+         }
+         prm.leave_subsection();
+         */
       }
 
       template <int dim>
