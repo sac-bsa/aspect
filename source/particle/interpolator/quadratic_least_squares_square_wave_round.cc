@@ -18,8 +18,9 @@
  <http://www.gnu.org/licenses/>.
  */
 
-#include <aspect/particle/interpolator/quadratic_least_squares_alpha_limiter.h>
+#include <aspect/particle/interpolator/quadratic_least_squares_square_wave_round.h>
 #include <aspect/particle/interpolator/cell_average.h>
+
 #include <aspect/postprocess/particles.h>
 #include <aspect/simulator.h>
 
@@ -37,10 +38,10 @@ namespace aspect
     {
       template <int dim>
       std::vector<std::vector<double> >
-      QuadraticLeastSquaresAlphaLimiter<dim>::properties_at_points(const ParticleHandler<dim> &particle_handler,
-                                                                   const std::vector<Point<dim> > &positions,
-                                                                   const ComponentMask &selected_properties,
-                                                                   const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
+      QuadraticLeastSquaresSquareWaveRound<dim>::properties_at_points(const ParticleHandler<dim> &particle_handler,
+                                                                        const std::vector<Point<dim> > &positions,
+                                                                        const ComponentMask &selected_properties,
+                                                                        const typename parallel::distributed::Triangulation<dim>::active_cell_iterator &cell) const
       {
         const unsigned int n_particle_properties = particle_handler.n_properties_per_particle();
 
@@ -158,8 +159,8 @@ namespace aspect
                 qr.solve(c[property_index], QTb[property_index]);
               }
           }
+        std::vector<bool> use_cell_average_limiter(n_particle_properties, false);
         unsigned int index_positions = 0;
-        std::vector<bool> use_alpha_limiter(n_particle_properties, false);
         for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
           {
             const Tensor<1, dim, double> relative_support_point_location = (*itr - approximated_cell_midpoint) / cell_diameter;
@@ -186,57 +187,14 @@ namespace aspect
                   }
 
                 // Overshoot and undershoot correction of interpolated particle property.
-                if (use_global_values_limiter)
-                  {
-                    const double original_interpolated_value = interpolated_value;
-                    interpolated_value = std::min(interpolated_value, global_maximum_particle_properties[property_index]);
-                    interpolated_value = std::max(interpolated_value, global_minimum_particle_properties[property_index]);
-                    if (original_interpolated_value != interpolated_value)
-                      use_alpha_limiter[property_index] = true;
-                  }
+                if (use_limiter && use_square_wave[property_index])
+                {
+                  interpolated_value = (interpolated_value > .5) ? 1 : 0;
+                }
                 cell_properties[index_positions][property_index] = interpolated_value;
               }
           }
 
-        for (unsigned int property_index = 0; property_index < n_particle_properties; ++property_index)
-          {
-            if (use_alpha_limiter[property_index])
-              {
-                CellAverage<dim> cell_average_interpolator;
-                const auto cell_average_values = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, cell)[0];
-                //TODO add sanity check that cell average value is within specified global constraints
-                //TODO calculate value for alpha
-                double alpha = 0;
-                double minimum_alpha = 0;
-                double maximum_alpha = 1;
-                const unsigned int alpha_iterations = 10;
-                for (unsigned int i = 0; i < alpha_iterations; ++i) 
-                {
-                  bool out_of_constraint = false;
-                  double alpha_guess = (minimum_alpha + maximum_alpha)/2;
-                  for (unsigned int positions_index = 0; positions_index < positions.size(); ++positions_index)
-                  {
-                    double value = alpha_guess * cell_properties[positions_index][property_index] + (1 - alpha_guess) * cell_average_values[property_index];
-                    if (value < global_minimum_particle_properties[property_index] || value > global_maximum_particle_properties[property_index])
-                    {
-                      out_of_constraint = true;
-                      break;
-                    }
-                  }
-                  if (out_of_constraint) {
-                    maximum_alpha = alpha_guess;
-                  } else {
-                    minimum_alpha = alpha_guess;
-                    alpha = std::max(alpha, alpha_guess);
-                  }
-
-                }
-                for (auto &position : cell_properties)
-                  {
-                    position[property_index] = alpha * position[property_index] + (1-alpha) *cell_average_values[property_index];
-                  }
-              }
-          }
         return cell_properties;
       }
 
@@ -244,49 +202,7 @@ namespace aspect
 
       template <int dim>
       void
-      QuadraticLeastSquaresAlphaLimiter<dim>::declare_parameters (ParameterHandler &prm)
-      {
-        /*prm.enter_subsection("Postprocess");
-        {
-          prm.enter_subsection("Particles");
-          {
-            prm.enter_subsection("Interpolator");
-            {
-              prm.enter_subsection("Quadratic least squares");
-              {
-                prm.declare_entry ("Global particle property maximum",
-                                   boost::lexical_cast<std::string>(std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The maximum global particle property values that will be used as a "
-                                   "limiter for the quadratic least squares interpolation. The number of the input "
-                                   "'Global particle property maximum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry ("Global particle property minimum",
-                                   boost::lexical_cast<std::string>(-std::numeric_limits<double>::max()),
-                                   Patterns::List(Patterns::Double ()),
-                                   "The minimum global particle property that will be used as a "
-                                   "limiter for the quadratic least squares interpolation. The number of the input "
-                                   "'Global particle property minimum' values separated by ',' has to be "
-                                   "the same as the number of particle properties.");
-                prm.declare_entry("Use limiter", "false",
-                                  Patterns::Bool (),
-                                  "Whether to apply a global particle property limiting scheme to the interpolated "
-                                  "particle properties.");
-
-              }
-              prm.leave_subsection();
-            }
-            prm.leave_subsection();
-          }
-          prm.leave_subsection();
-        }
-        prm.leave_subsection();
-        */
-      }
-
-      template <int dim>
-      void
-      QuadraticLeastSquaresAlphaLimiter<dim>::parse_parameters (ParameterHandler &prm)
+       QuadraticLeastSquaresSquareWaveRound<dim>::declare_parameters (ParameterHandler &prm)
       {
         prm.enter_subsection("Postprocess");
         {
@@ -296,23 +212,46 @@ namespace aspect
             {
               prm.enter_subsection("Quadratic least squares");
               {
-                use_global_values_limiter = prm.get_bool("Use limiter");
-                if (use_global_values_limiter)
-                  {
-                    global_maximum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property maximum")));
-                    global_minimum_particle_properties = Utilities::string_to_double(Utilities::split_string_list(prm.get("Global particle property minimum")));
+                // Use limiter declared in qls.cc
+                prm.declare_entry("Use square wave limiter",
+                                  "0",
+                                  Patterns::List(Patterns::Double ()),
+                                  "Whether or not to use the square wave treatment upon each particle property, use 0 or 1");
+              }
+              prm.leave_subsection();
+            }
+            prm.leave_subsection();
+          }
+          prm.leave_subsection();
+        }
+        prm.leave_subsection();
+      }
 
+      template <int dim>
+      void
+       QuadraticLeastSquaresSquareWaveRound<dim>::parse_parameters (ParameterHandler &prm)
+      {
+        prm.enter_subsection("Postprocess");
+        {
+          prm.enter_subsection("Particles");
+          {
+            prm.enter_subsection("Interpolator");
+            {
+              prm.enter_subsection("Quadratic least squares");
+              {
+                use_limiter = prm.get_bool("Use limiter");
+                if (use_limiter)
+                  {
+                    std::vector<double> use_square_wave_double = Utilities::string_to_double(Utilities::split_string_list(prm.get("Use square wave limiter")));
                     const Postprocess::Particles<dim> &particle_postprocessor =
                       this->get_postprocess_manager().template get_matching_postprocessor<const Postprocess::Particles<dim> >();
                     const unsigned int n_property_components = particle_postprocessor.get_particle_world().get_property_manager().get_n_property_components();
-
-                    AssertThrow(global_minimum_particle_properties.size() == n_property_components,
-                                ExcMessage("Make sure that the size of list 'Global minimum particle property' "
+                    AssertThrow(use_square_wave_double.size() == n_property_components,
+                                ExcMessage("Make sure that the size of list 'Use square wave limiter' "
                                            "is equivalent to the number of particle properties."));
-
-                    AssertThrow(global_maximum_particle_properties.size() == n_property_components,
-                                ExcMessage("Make sure that the size of list 'Global maximum particle property' "
-                                           "is equivalent to the number of particle properties."));
+                    use_square_wave.reserve(n_property_components);
+                    for (unsigned int i = 0; i < n_property_components; ++i)
+                      use_square_wave[i] = (use_square_wave_double[i] == 1);
                   }
               }
               prm.leave_subsection();
@@ -335,8 +274,8 @@ namespace aspect
   {
     namespace Interpolator
     {
-      ASPECT_REGISTER_PARTICLE_INTERPOLATOR(QuadraticLeastSquaresAlphaLimiter,
-                                            "quadratic least squares alpha",
+      ASPECT_REGISTER_PARTICLE_INTERPOLATOR(QuadraticLeastSquaresSquareWaveRound,
+                                            "quadratic least squares square wave rounder",
                                             "Interpolates particle properties onto a vector of points using a "
                                             "quadratic least squares method. Note that deal.II must be configured "
                                             "with BLAS/LAPACK.")
