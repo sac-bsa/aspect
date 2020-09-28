@@ -20,6 +20,7 @@
  */
 
 #include <aspect/particle/interpolator/bilinear_least_squares_van_leer.h>
+#include <aspect/particle/interpolator/cell_average.h>
 #include <aspect/postprocess/particles.h>
 #include <aspect/simulator.h>
 
@@ -132,14 +133,62 @@ namespace aspect
         A.Tmmult(B, A, false);
         dealii::LAPACKFullMatrix<double> B_inverse(B);
         B_inverse.compute_inverse_svd(threshold);
-
+        CellAverage<dim> cell_average_interpolator;
         for (unsigned int property_index = 0; property_index < n_particle_properties; ++property_index)
           {
             if (selected_properties[property_index])
               {
+                //const double current_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell)[0][property_index];
                 A.Tvmult(c_ATr[property_index],r[property_index]);
                 B_inverse.vmult(c[property_index], c_ATr[property_index]);
-                //TODO actually limit using Van Leer
+                const double current_cell_average = c[property_index][0];
+                // Try to limit in the x direction
+                if (!(found_cell->at_boundary(0) || found_cell->at_boundary(1))) {
+                  // TODO left right
+                  const auto &lower_cell = found_cell->neighbor(0);
+                  const auto &upper_cell = found_cell->neighbor(1);
+                  const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
+                  const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
+                  //double centered_difference = upper_cell_average - lower_cell_average;
+                  double c_one = c[property_index][1];
+                  double left_difference = current_cell_average - lower_cell_average;
+                  double right_difference = upper_cell_average - current_cell_average;
+                  double phi = left_difference * right_difference;
+                  double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_one)/2, 2*std::abs(right_difference)));
+                  double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_one)*theta : 0);
+                  c[property_index][1] = van_leer_difference;
+                }
+                if (!(found_cell->at_boundary(2) || found_cell->at_boundary(3))) {
+                  // TODO front back
+                  const auto &lower_cell = found_cell->neighbor(2);
+                  const auto &upper_cell = found_cell->neighbor(3);
+                  const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
+                  const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
+                  //double centered_difference = upper_cell_average - lower_cell_average;
+                  double c_two = c[property_index][2];
+                  double left_difference = current_cell_average - lower_cell_average;
+                  double right_difference = upper_cell_average - current_cell_average;
+                  double phi = left_difference * right_difference;
+                  double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_two)/2, 2*std::abs(right_difference)));
+                  double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_two)*theta : 0);
+                  c[property_index][2] = van_leer_difference;
+                }
+                if (dim == 3 && !(found_cell->at_boundary(4) || found_cell->at_boundary(5))) {
+                  const auto &lower_cell = found_cell->neighbor(4);
+                  const auto &upper_cell = found_cell->neighbor(5);
+                  const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
+                  const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
+                  //double centered_difference = upper_cell_average - lower_cell_average;
+                  double c_three = c[property_index][3];
+                  double left_difference = current_cell_average - lower_cell_average;
+                  double right_difference = upper_cell_average - current_cell_average;
+                  double phi = left_difference * right_difference;
+                  double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_three)/2, 2*std::abs(right_difference)));
+                  double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_three)*theta : 0);
+                  c[property_index][3] = van_leer_difference;
+                }
+                //TODO maybe look at limiting with Van Leer when against
+                //boundary as well
               }
           }
 
@@ -159,6 +208,7 @@ namespace aspect
                 cell_properties[index_positions][property_index] = interpolated_value;
               }
           }
+
         return cell_properties;
       }
 
