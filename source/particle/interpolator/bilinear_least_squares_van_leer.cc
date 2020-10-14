@@ -73,6 +73,8 @@ namespace aspect
           }
         else
           found_cell = cell;
+        // TODO find 'actual' midpoint by taking vertex(0) and subtracting 1/2 extent(0) and 1/2 extent(1)
+        // (extent(0) - vertex(0)[0])/2
 
         const typename ParticleHandler<dim>::particle_iterator_range particle_range =
           particle_handler.particles_in_cell(found_cell);
@@ -110,14 +112,17 @@ namespace aspect
               if (selected_properties[property_index])
                 r[property_index][positions_index] = particle_property_value[property_index];
 
-            const Tensor<1, dim, double> relative_particle_position = (particle->get_location() - approximated_cell_midpoint) / cell_diameter;
-            A(positions_index, 0) = 1;
+            Tensor<1, dim, double> relative_particle_position = particle->get_location() - approximated_cell_midpoint;
+            relative_particle_position[0] /= found_cell->extent_in_direction(0);
+            relative_particle_position[1] /= found_cell->extent_in_direction(1);
+            if (dim == 3)
+              relative_particle_position[2] /= found_cell->extent_in_direction(2);
+A(positions_index, 0) = 1;
             A(positions_index, 1) = relative_particle_position[0];
             A(positions_index, 2) = relative_particle_position[1];
             if (dim == 3)
               {
                 A(positions_index, 3) = relative_particle_position[2];
-                AssertThrow(false, ExcNotImplemented("The van leer limiter currently is only being tested on 2D models"));
               }
           }
 
@@ -141,7 +146,9 @@ namespace aspect
                 //const double current_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell)[0][property_index];
                 A.Tvmult(c_ATr[property_index],r[property_index]);
                 B_inverse.vmult(c[property_index], c_ATr[property_index]);
-                const double current_cell_average = c[property_index][0];
+                //const double current_cell_average = c[property_index][0];
+                const double current_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell)[0][property_index];
+                c[property_index][0] = current_cell_average;
                 // Try to limit in the x direction
                 if (!(found_cell->at_boundary(0) || found_cell->at_boundary(1))) {
                   // TODO left right
@@ -151,8 +158,8 @@ namespace aspect
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
                   double c_one = c[property_index][1];
-                  double left_difference = current_cell_average - lower_cell_average;
-                  double right_difference = upper_cell_average - current_cell_average;
+                  double left_difference = (current_cell_average - lower_cell_average) / found_cell->extent_in_direction(0);
+                  double right_difference = (upper_cell_average - current_cell_average) / found_cell->extent_in_direction(0);
                   double phi = left_difference * right_difference;
                   double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_one)/2, 2*std::abs(right_difference)));
                   double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_one)*theta : 0);
@@ -166,8 +173,8 @@ namespace aspect
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
                   double c_two = c[property_index][2];
-                  double left_difference = current_cell_average - lower_cell_average;
-                  double right_difference = upper_cell_average - current_cell_average;
+                  double left_difference = (current_cell_average - lower_cell_average) / found_cell->extent_in_direction(1);
+                  double right_difference = (upper_cell_average - current_cell_average) / found_cell->extent_in_direction(1);
                   double phi = left_difference * right_difference;
                   double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_two)/2, 2*std::abs(right_difference)));
                   double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_two)*theta : 0);
@@ -180,8 +187,8 @@ namespace aspect
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
                   double c_three = c[property_index][3];
-                  double left_difference = current_cell_average - lower_cell_average;
-                  double right_difference = upper_cell_average - current_cell_average;
+                  double left_difference = (current_cell_average - lower_cell_average) / found_cell->extent_in_direction(2);
+                  double right_difference = (upper_cell_average - current_cell_average) / found_cell->extent_in_direction(2);
                   double phi = left_difference * right_difference;
                   double theta = std::min(2*std::abs(left_difference), std::min(std::abs(c_three)/2, 2*std::abs(right_difference)));
                   double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_three)*theta : 0);
@@ -194,7 +201,11 @@ namespace aspect
 
         for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
           {
-            const Tensor<1, dim, double> relative_support_point_location = (*itr - approximated_cell_midpoint) / cell_diameter;
+            Tensor<1, dim, double> relative_support_point_location = *itr - approximated_cell_midpoint;
+            relative_support_point_location[0] /= found_cell->extent_in_direction(0);
+            relative_support_point_location[1] /= found_cell->extent_in_direction(1);
+            if (dim == 3)
+              relative_support_point_location[2] /= found_cell->extent_in_direction(2);
             for (unsigned int property_index = 0; property_index < n_particle_properties; ++property_index)
               {
                 double interpolated_value = c[property_index][0] +
