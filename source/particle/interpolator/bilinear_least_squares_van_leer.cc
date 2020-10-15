@@ -1,4 +1,3 @@
-
 /*
   Copyright (C) 2020 by the authors of the ASPECT code.
 
@@ -73,6 +72,8 @@ namespace aspect
           }
         else
           found_cell = cell;
+        //std::cout << "beginning" << std::endl;
+        //AssertThrow(!found_cell->is_artificial(), ExcNotImplemented("The found cell was artificial?"));
         // TODO find 'actual' midpoint by taking vertex(0) and subtracting 1/2 extent(0) and 1/2 extent(1)
         // (extent(0) - vertex(0)[0])/2
 
@@ -139,6 +140,7 @@ A(positions_index, 0) = 1;
         dealii::LAPACKFullMatrix<double> B_inverse(B);
         B_inverse.compute_inverse_svd(threshold);
         CellAverage<dim> cell_average_interpolator;
+        //std::cout << "middle"<<std::endl;
         for (unsigned int property_index = 0; property_index < n_particle_properties; ++property_index)
           {
             if (selected_properties[property_index])
@@ -150,10 +152,15 @@ A(positions_index, 0) = 1;
                 const double current_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, found_cell)[0][property_index];
                 c[property_index][0] = current_cell_average;
                 // Try to limit in the x direction
-                if (!(found_cell->at_boundary(0) || found_cell->at_boundary(1))) {
+                if (!(found_cell->at_boundary(0) || found_cell->at_boundary(1)) && 
+                    (found_cell->neighbor(0).state() == dealii::IteratorState::valid && found_cell->neighbor(0)->is_active() &&
+                     found_cell->neighbor(1).state() == dealii::IteratorState::valid && found_cell->neighbor(1)->is_active())) {
                   // TODO left right
                   const auto &lower_cell = found_cell->neighbor(0);
                   const auto &upper_cell = found_cell->neighbor(1);
+                  //AssertThrow(lower_cell.state() == dealii::IteratorState::valid && lower_cell->is_active() &&
+                  //            upper_cell.state() == dealii::IteratorState::valid && upper_cell->is_active(),
+                  //            ExcNotImplemented("Yes, I didn't do this yet"));
                   const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
@@ -165,10 +172,15 @@ A(positions_index, 0) = 1;
                   double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_one)*theta : 0);
                   c[property_index][1] = van_leer_difference;
                 }
-                if (!(found_cell->at_boundary(2) || found_cell->at_boundary(3))) {
+                if (!(found_cell->at_boundary(2) || found_cell->at_boundary(3)) && 
+                    (found_cell->neighbor(2).state() == dealii::IteratorState::valid && found_cell->neighbor(2)->is_active() &&
+                     found_cell->neighbor(3).state() == dealii::IteratorState::valid && found_cell->neighbor(3)->is_active())) {
                   // TODO front back
                   const auto &lower_cell = found_cell->neighbor(2);
                   const auto &upper_cell = found_cell->neighbor(3);
+                  //AssertThrow(lower_cell.state() == dealii::IteratorState::valid && lower_cell->is_active() &&
+                  //            upper_cell.state() == dealii::IteratorState::valid && upper_cell->is_active(),
+                  //            ExcNotImplemented("Yes, I didn't do this yet"));
                   const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
@@ -180,9 +192,14 @@ A(positions_index, 0) = 1;
                   double van_leer_difference =  ((phi > 0) ? std::copysign(1, c_two)*theta : 0);
                   c[property_index][2] = van_leer_difference;
                 }
-                if (dim == 3 && !(found_cell->at_boundary(4) || found_cell->at_boundary(5))) {
+                if (dim == 3 && !(found_cell->at_boundary(4) || found_cell->at_boundary(5)) && 
+                                (found_cell->neighbor(4).state() == dealii::IteratorState::valid && found_cell->neighbor(4)->is_active() &&
+                                 found_cell->neighbor(5).state() == dealii::IteratorState::valid && found_cell->neighbor(5)->is_active())) {
                   const auto &lower_cell = found_cell->neighbor(4);
                   const auto &upper_cell = found_cell->neighbor(5);
+                  //AssertThrow(lower_cell.state() == dealii::IteratorState::valid && lower_cell->is_active() &&
+                  //            upper_cell.state() == dealii::IteratorState::valid && upper_cell->is_active(),
+                  //            ExcNotImplemented("Yes, I didn't do this yet"));
                   const double lower_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, lower_cell)[0][property_index];
                   const double upper_cell_average = cell_average_interpolator.properties_at_points(particle_handler, positions, selected_properties, upper_cell)[0][property_index];
                   //double centered_difference = upper_cell_average - lower_cell_average;
@@ -198,7 +215,7 @@ A(positions_index, 0) = 1;
                 //boundary as well
               }
           }
-
+        //std::cout << "end" << std::endl;
         for (typename std::vector<Point<dim>>::const_iterator itr = positions.begin(); itr != positions.end(); ++itr, ++index_positions)
           {
             Tensor<1, dim, double> relative_support_point_location = *itr - approximated_cell_midpoint;
@@ -219,7 +236,6 @@ A(positions_index, 0) = 1;
                 cell_properties[index_positions][property_index] = interpolated_value;
               }
           }
-
         return cell_properties;
       }
 

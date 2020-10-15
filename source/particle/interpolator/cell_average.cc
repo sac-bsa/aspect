@@ -97,6 +97,8 @@ namespace aspect
             unsigned int non_empty_neighbors = 0;
             for (unsigned int i=0; i<neighbors.size(); ++i)
               {
+                if (neighbors[i]->is_artificial())
+                  continue;
                 // Only recursively call this function if the neighbor cell contains
                 // particles (else we end up in an endless recursion)
                 if (particle_handler.n_particles_in_cell(neighbors[i]) == 0)
